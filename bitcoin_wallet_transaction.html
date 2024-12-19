@@ -1,0 +1,136 @@
+// server.js - Node.js server to serve the Blockchain Wallet React App
+const express = require('express');
+const path = require('path');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, 'build')));
+
+// API endpoint to handle transactions
+app.use(express.json());
+
+app.post('/api/transaction', (req, res) => {
+  const { recipient, amount } = req.body;
+  const transactionFeeRate = 0.0001; // Fee rate as a percentage
+
+  if (!recipient || !amount || amount <= 0) {
+    return res.status(400).json({ error: 'Invalid transaction data' });
+  }
+
+  const transactionFee = amount * transactionFeeRate;
+  const totalAmount = amount + transactionFee;
+
+  return res.status(200).json({
+    success: true,
+    message: `Transaction processed. Amount: ${amount} BTC, Fee: ${transactionFee.toFixed(8)} BTC, Total: ${totalAmount.toFixed(8)} BTC.`
+  });
+});
+
+// Catch-all handler for React's index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
+
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
+
+// React Blockchain Wallet with Fee Deduction
+import React, { useState, useEffect } from 'react';
+import { X, Send, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+
+const BlockchainWallet = () => {
+  const [connected, setConnected] = useState(true);
+  const [balance, setBalance] = useState(1000000000000000000000000.23456789);
+  const [pendingBalance, setPendingBalance] = useState(0.01234567);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [recipient, setRecipient] = useState('');
+  const [amount, setAmount] = useState('');
+  const [transactions, setTransactions] = useState([
+    {
+      id: 'TX-FF5E23',
+      status: 'PENDING', 
+      amount: 0.5,
+      recipient: 'John Doe',
+      timestamp: '12:34:56'
+    }
+  ]);
+  const [alerts, setAlerts] = useState([
+    { id: 1, message: '거래가 시작되었습니다: 0.50000000 BTC' }
+  ]);
+
+  const formatBTC = (value) => {
+    return Number(value).toFixed(8);
+  };
+
+  const addAlert = (message) => {
+    const newAlert = {
+      id: Date.now(),
+      message
+    };
+    setAlerts(prev => [newAlert, ...prev].slice(0, 3));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!recipient || !amount) return;
+
+    const transactionFeeRate = 0.0001; // Fee rate as a percentage
+    const parsedAmount = parseFloat(amount);
+    const transactionFee = parsedAmount * transactionFeeRate;
+    const totalAmount = parsedAmount + transactionFee;
+
+    if (balance < totalAmount) {
+      addAlert('잔액이 부족합니다.');
+      return;
+    }
+
+    const newTx = {
+      id: 'TX-' + Math.random().toString(16).slice(2, 8).toUpperCase(),
+      status: 'PENDING',
+      amount: parsedAmount,
+      recipient,
+      timestamp: new Date().toLocaleTimeString()
+    };
+
+    setTransactions(prev => [newTx, ...prev]);
+    setBalance(prev => prev - totalAmount);
+    setPendingBalance(prev => prev + parsedAmount);
+    addAlert(`거래가 시작되었습니다: ${formatBTC(parsedAmount)} BTC (수수료: ${formatBTC(transactionFee)} BTC)`);
+
+    setShowTransferModal(false);
+    setRecipient('');
+    setAmount('');
+
+    // Simulating server confirmation
+    setTimeout(() => {
+      setTransactions(prev => prev.map(tx => tx.id === newTx.id ? { ...tx, status: 'COMPLETED' } : tx));
+      setPendingBalance(prev => prev - parsedAmount);
+    }, 5000);
+  };
+
+  const toggleConnection = () => {
+    setConnected(prev => !prev);
+    addAlert(`연결이 ${!connected ? '설정' : '해제'}되었습니다`);
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (Math.random() < 0.1) {
+        toggleConnection();
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [connected]);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* ...Rest of the UI remains the same... */}
+    </div>
+  );
+};
+
+export default BlockchainWallet;
